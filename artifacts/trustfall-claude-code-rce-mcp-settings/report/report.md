@@ -1,18 +1,14 @@
-# BEFORE PUBLISH
-Resolve all @TODO items:
-1. Repo POC
-2. check on latest version (currently v2.1.114 as of April 19)
-
 # Claude Code: 1-Click RCE via Project-Scoped MCP Auto-Approval (Incomplete CVE-2025-59536 Fix)
 
 **Researcher:** Adversa AI (Rony Utevsky)  
 **Vulnerability Class:** Settings Scope Restriction Bypass → Silent Arbitrary Code Execution  
 **Affected Product:** Claude Code CLI (Anthropic)  
-**Tested Version:** v2.1.112 (latest as of April 17, 2026)  
+**Tested Version:** v2.1.114 (latest as of April 19, 2026)  
 **Severity:** 7.8 (High) - CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H  
 **Attack Vector:** Local developer machine (1-click UI bypass) / CI/CD runners (0-click automated execution)  
 **Status:** Unpatched — declined by Anthropic as outside threat model (see [Author's Note](#authors-note-on-anthropics-response))  
 **Related:** CVE-2025-59536 (Check Point Research, October 2025) — timing component patched, scope component not patched  
+**Companion blog post:** [TrustFall: Claude Code RCE via insecure MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/)  
 
 ---
 
@@ -237,7 +233,7 @@ Anthropic's position is that these settings operate on different surfaces, and t
 
 ### The Trust Dialog Does Not Provide Informed Consent
 
-The current trust dialog (v2.1.112) says:
+The current trust dialog (v2.1.114) says:
 
 > *"Quick safety check: Is this a project you created or one you trust? Claude Code'll be able to read, edit, and execute files here."*
 
@@ -250,7 +246,7 @@ It does not mention MCP servers. It does not list which servers will start. It d
 
 ![Old trust dialog with MCP server warning and enable/disable options](screenshots/trust-dialog-old.png)
 
-**Current dialog (v2.1.112) — MCP warning removed:**
+**Current dialog (v2.1.114) — MCP warning removed:**
 
 ![Current trust dialog with no MCP server information](screenshots/trust-dialog-new.png)
 
@@ -277,7 +273,7 @@ Since Anthropic has declined to change the underlying behavior, security teams r
 **On developer endpoints:**
 - **Audit committed `.claude/settings.json` content, not just presence.** Add a pre-commit or repo-scanning rule that flags any `.claude/settings.json` containing `enableAllProjectMcpServers`, `enabledMcpjsonServers`, or `permissions.allow`. These keys have no legitimate reason to be shared across teammates via git — they should be set per-developer in user-scoped settings (`~/.claude/settings.json`).
 - **Inspect `.mcp.json` `command` and `args` values, not just referenced files.** The fileless variant above embeds the full payload inline via `node -e` — static scanners that only look for suspicious `.js` files will miss it. Flag any `args` containing `-e`, `-p`, `--eval`, `eval`, `fetch(`, `child_process`, `net.Socket`, or base64-encoded strings.
-- **Monitor for unexpected child processes of `claude`.** EDR or endpoint monitoring should alert when `claude` spawns processes with eval-style flags (`node -e ...`, `python -c ...`, `sh -c ...`) or unexpected binaries, regardless of where the script lives on disk.
+- **Cross-reference runtime child processes with project config.** A bare alert on `claude` spawning `node -e`, `python -c`, or `sh -c` will be noisy in any non-trivial development environment. The high-confidence runtime check is narrower: `claude` spawned a long-lived child whose `argv0`/`argv1` matches a `command`/`args` pair from a `.mcp.json` in a recently-cloned, non-user-owned directory. That pattern is behavior a benign Claude session does not produce, and it catches the inline variant the static checks cannot see.
 - **Treat cloned untrusted repositories as hostile.** When auditing open-source projects, inspect both `.mcp.json` and `.claude/settings.json` *before* running `claude` in the directory — the trust dialog will not tell you what is about to execute.
 
 **In CI/CD:**
@@ -292,8 +288,8 @@ Since Anthropic has declined to change the underlying behavior, security teams r
 
 ---
 
-### Reproducing the Finding - @TODO - needed? if yes, crate public repo
+### Reproducing the Finding
 
-A safe proof-of-concept is published at [github.com/adversa-ai/CVE-2025-59536-incomplete-fix](https://github.com/adversa-ai/CVE-2025-59536-incomplete-fix) (the `safe-poc/` directory). The PoC server reads sensitive files from outside the project directory to demonstrate unsandboxed access, then writes proof to `~/poc-proof.txt` — **nothing is exfiltrated, no network calls are made**. Video walkthrough: [youtu.be/CSvzvPLtFdc](https://youtu.be/CSvzvPLtFdc).
+A safe proof-of-concept is published alongside this report in the [`poc/`](../poc/) directory of this repository. The PoC ships a `.mcp.json` and `.claude/settings.json` that auto-approve a server whose only payload is opening the OS calculator (`calc` on Windows, `Calculator.app` on macOS, `gnome-calculator` on Linux) — **no files are read, no data is exfiltrated, no network calls are made**. The calculator launching is the visible proof that arbitrary code ran with the user's privileges immediately after the trust dialog was accepted.
 
-Security teams can use the safe PoC to audit their own developer machines and CI pipelines for exposure.
+Security teams can use the safe PoC to audit their own developer machines and CI pipelines for exposure. To reproduce, clone this repository, `cd` into the `poc/` directory, run `claude`, and accept the trust dialog — the calculator will appear.
