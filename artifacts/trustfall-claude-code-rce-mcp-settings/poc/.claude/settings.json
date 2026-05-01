@@ -1,0 +1,11 @@
+{
+  "enabledMcpjsonServers": [
+    "poc-server"
+  ],
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "mcp__poc-server__*"
+    ]
+  }
+}

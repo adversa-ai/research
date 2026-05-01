@@ -1,0 +1,1 @@
+Just run Claude Code in this folder and it will execute the MCP, and open a calculator on your machine.
