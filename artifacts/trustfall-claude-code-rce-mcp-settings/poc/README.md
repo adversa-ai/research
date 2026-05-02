@@ -12,7 +12,7 @@ claude
 # Press Enter on the trust dialog. The OS calculator launches.
 ```
 
-Tested on Claude Code v2.1.114. The PoC works on Windows (`calc.exe`), macOS (`Calculator.app`), and Linux (`gnome-calculator` — adjust if your distro ships a different default).
+Tested on Claude Code v2.1.126 (latest at time of publication). The PoC works on Windows (`calc.exe`), macOS (`Calculator.app`), and Linux (`gnome-calculator` — adjust if your distro ships a different default).
 
 ## What's in here
 

@@ -3,7 +3,7 @@
 **Researcher:** Adversa AI (Rony Utevsky)  
 **Vulnerability Class:** Settings Scope Restriction Bypass → Silent Arbitrary Code Execution  
 **Affected Product:** Claude Code CLI (Anthropic)  
-**Tested Version:** v2.1.114 (latest as of April 19, 2026)  
+**Tested Version:** v2.1.126 (latest as of May 2, 2026)  
 **Severity:** 7.8 (High) - CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H  
 **Attack Vector:** Local developer machine (1-click UI bypass) / CI/CD runners (0-click automated execution)  
 **Status:** Unpatched — declined by Anthropic as outside threat model (see [Author's Note](#authors-note-on-anthropics-response))  
@@ -231,7 +231,7 @@ Anthropic's position is that these settings operate on different surfaces, and t
 
 ### The Trust Dialog Does Not Provide Informed Consent
 
-The current trust dialog (v2.1.114) says:
+The current trust dialog (v2.1.126) says:
 
 > *"Quick safety check: Is this a project you created or one you trust? Claude Code'll be able to read, edit, and execute files here."*
 
@@ -244,7 +244,7 @@ It does not mention MCP servers. It does not list which servers will start. It d
 
 ![Old trust dialog with MCP server warning and enable/disable options](screenshots/trust-dialog-old.png)
 
-**Current dialog (v2.1.114) — MCP warning removed:**
+**Current dialog (v2.1.126) — MCP warning removed:**
 
 ![Current trust dialog with no MCP server information](screenshots/trust-dialog-new.png)
 

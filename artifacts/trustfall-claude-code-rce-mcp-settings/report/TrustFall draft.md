@@ -17,7 +17,7 @@
 
 | Researcher: | Rony Utevsky (Adversa AI) |
 | :---- | :---- |
-| **Affected:** | Claude Code CLI, tested on v2.1.114 |
+| **Affected:** | Claude Code CLI, tested on v2.1.126 (latest as of May 2, 2026) |
 | **Severity:** | CVSS 7.8 (High) — CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H |
 | **Status:** | Unpatched. Declined by Anthropic as outside threat model. See appendix for full position. |
 | **Proof of concept and full report:** | [github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings) — safe, non-exfiltrating reproduction (opens the OS calculator) plus the full technical report. |
@@ -60,7 +60,7 @@ The old trust dialog (pre-v2.1) listed every MCP server defined in a project, sh
 
 ![Old Claude Code Trust Dialog - TrustFall][image1]
 
-The current dialog (v2.1.114) is generic:  
+The current dialog (v2.1.126) is generic:  
 *“Quick safety check: Is this a project you created or one you trust? Claude Code’ll be able to read, edit, and execute files here”*
 
 *![Claude Code New trust dialog with no MCP server information][image2]*
