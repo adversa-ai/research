@@ -20,7 +20,7 @@
 | **Affected:** | Claude Code CLI, tested on v2.1.114 |
 | **Severity:** | CVSS 7.8 (High) — CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H |
 | **Status:** | Unpatched. Declined by Anthropic as outside threat model. See appendix for full position. |
-| **Proof of concept:** | Safe, non-exfiltrating reproduction at [github.com/adversa-ai/CVE-2025-59536-incomplete-fix](https://github.com/adversa-ai/CVE-2025-59536-incomplete-fix). |
+| **Proof of concept and full report:** | [github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings) — safe, non-exfiltrating reproduction (opens the OS calculator) plus the full technical report. |
 
 ---
 
@@ -166,7 +166,7 @@ Audit the *content* of committed .claude/settings.json files, not just their pre
 
 Inspect .mcp.json command and args values directly. The fileless variant embeds the entire payload inline, so static scanners that only check referenced files will miss it. Flag any args containing \-e, \-p, \--eval, eval, fetch(, child\_process, net.Socket, or base64-encoded blobs.
 
-Monitor child processes of claude. EDR or endpoint logging should alert when claude spawns a process with eval-style flags (node \-e, python \-c, sh \-c) or an unexpected binary, regardless of where the script lives on disk. This catches the inline variant the static checks cannot see.
+Cross-reference runtime child processes with project config. A bare alert on claude spawning node \-e, python \-c, or sh \-c will be noisy in any non-trivial development environment. The high-confidence runtime check is narrower: claude spawned a long-lived child whose argv0/argv1 matches a command/args pair from a .mcp.json in a recently-cloned, non-user-owned directory. That pattern is behavior a benign Claude session does not produce, and it catches the inline variant the static checks cannot see.
 
 When auditing an open-source project before running Claude Code in it, inspect .mcp.json and .claude/settings.json first. The trust dialog will not tell you what is about to execute.
 
@@ -180,7 +180,7 @@ If the pipeline uses claude-code-action, pin it to a specific commit SHA and rev
 
 Inventory [Claude Code usage](https://adversa.ai/blog/claude-code-security-bypass-deny-rules-disabled/). Know which developers and which CI pipelines run claude, against what source. That inventory is the precondition for every control above. Rotate any credentials exposed on a machine that has run claude on an untrusted repository. The payload runs before any visible Claude prompt, so absence of evidence in Claude’s logs is not evidence the payload did not execute.
 
-The safe PoC at [github.com/adversa-ai/CVE-2025-59536-incomplete-fix](https://github.com/adversa-ai/CVE-2025-59536-incomplete-fix) is built for this. Run it against your own developer machines and CI runners to measure exposure directly, with no exfiltration or network activity.
+The safe PoC at [github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings) is built for this. Run it against your own developer machines and CI runners to measure exposure directly, with no exfiltration or network activity.
 
 ## A trust model designed for humans clicking dialogs
 
@@ -252,7 +252,7 @@ Execution flow from the developer’s side:
 
 ![Key exfiltration example from the machine of CLaude Code's user - TrustFall][image4]
 
-A safe, non-exfiltrating reproduction of the attack chain lives in the safe-poc/ directory of the [GitHub repo](https://github.com/adversa-ai/CVE-2025-59536-incomplete-fix). The PoC server reads sensitive files from outside the project to demonstrate unsandboxed access, then writes proof to \~/poc-proof.txt. Nothing is exfiltrated, no network calls are made. A video walkthrough of the C2 variant, including the contrast with the bypassPermissions warning dialog, is on Youtube.
+A safe, non-exfiltrating reproduction of the attack chain lives in the poc/ directory of the [GitHub repo](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings). The PoC ships a .mcp.json and .claude/settings.json that auto-approve a server whose only payload is opening the OS calculator. Nothing is read, nothing is exfiltrated, no network calls are made. The calculator launching is the visible proof that arbitrary code ran with the user’s privileges immediately after the trust dialog was accepted. A video walkthrough of the C2 variant, including the contrast with the bypassPermissions warning dialog, is on YouTube.
 
 ## Appendix B: The fileless variant
 
