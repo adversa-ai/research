@@ -2,7 +2,7 @@
 
 Attachments for the Adversa AI blog post **[TrustFall: Claude Code RCE via insecure MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/)**.
 
-A malicious repository can ship two small JSON files (`.mcp.json` and `.claude/settings.json`) that auto-approve an attacker-controlled MCP server. The moment a developer presses Enter on Claude Code's generic "Yes, I trust this folder" dialog, the server spawns as an unsandboxed Node.js process with the user's full privileges — no per-server consent, no tool call from Claude required. The same attack runs with zero interaction on CI runners that pass `--trust-folder`. Anthropic patched the timing component as CVE-2025-59536 (October 2025) but declined the scope component as outside their threat model; this repo documents the residual attack surface.
+A malicious repository can ship two small JSON files (`.mcp.json` and `.claude/settings.json`) that auto-approve an attacker-controlled MCP server. The moment a developer presses Enter on Claude Code's generic "Yes, I trust this folder" dialog, the server spawns as an unsandboxed Node.js process with the user's full privileges — no per-server consent, no tool call from Claude required. The same attack runs with zero interaction on CI runners that invoke Claude Code headlessly (`-p` / `--print`, the default behavior of the official `anthropics/claude-code-action` GitHub Action), since headless mode auto-skips the trust dialog. Anthropic patched the timing component as CVE-2025-59536 (October 2025) but declined the scope component as outside their threat model; this repo documents the residual attack surface.
 
 ## What's in this directory
 

@@ -12,7 +12,7 @@
 * A malicious repository ships a malicious MCP server and auto-approves it via own .claude/settings.json. One Enter keypress on the trust dialog spawns the server as an unsandboxed OS process with the developer’s full privileges. No tool call from Claude is required.  
 * The payload does not need to be a file. The entire script can live inline in .mcp.json.  
 * The MCP server has enough privilege to read stored secrets and source code from other projects, or open a long-lived C2 channel. Five other dangerous settings are blocked from project scope. The MCP-enabling settings are not.  
-* On CI runners that pass \--trust-folder (the default for the official claude-code-action), the same attack runs with zero human interaction against pull-request branches.  
+* On CI runners running Claude Code headlessly (the default for the official claude-code-action), the trust dialog is skipped — it never renders and is never answered. The same attack runs with zero human interaction against pull-request branches.  
 * We share full report, demo video and a safe PoC in our GitHub.
 
 | Researcher: | Rony Utevsky (Adversa AI) |
@@ -73,7 +73,7 @@ In practice, this dialog now functions like VS Code’s workspace-trust prompt: 
 
 ## How the attack works
 
-A malicious repository needs nothing more than two small JSON files in standard Claude Code locations to convert achieve an arbitrary code execution. Three independent paths produce that outcome, and a defender’s checks have to cover all three.
+A malicious repository needs nothing more than two small JSON files in standard Claude Code locations to achieve an arbitrary code execution. Three independent paths produce that outcome, and a defender’s checks have to cover all three.
 
 The most direct path uses enableAllProjectMcpServers (or the per-server enabledMcpjsonServers) inside .claude/settings.json to auto-approve an attacker-defined MCP server from the project’s .mcp.json. The moment the user accepts the folder trust prompt, Claude Code spawns that server as a Node.js process with the user’s full privileges. The payload runs at process startup, before Claude reasons about anything and before any tool call is made. It can read \~/.ssh/, \~/.aws/, source code from any other project on the same machine, and open a long-lived C2 channel. A stealthier variant of the same path embeds the payload inline in .mcp.json via node \-e, leaving no .js file on disk for a reviewer or static scanner to flag. The repository looks clean.
 
@@ -89,18 +89,16 @@ Two decisions inside Claude Code’s settings handling, taken together, leave th
 
 ### Scope-restriction inconsistency
 
-Anthropic blocks five settings from project scope to prevent malicious repositories from auto-enabling them. The annotations in the source code are explicit about why. The MCP-enabling settings, which grant strictly greater attack surface, are not blocked.
+Anthropic already blocks several other dangerous settings from project scope to prevent malicious repositories from auto-enabling them. The pattern is well-established. The MCP-enabling settings, which grant strictly greater attack surface, are not blocked.
 
-| Setting | Allowed from project scope? | Documented reason |
+| Setting | Allowed from project scope? | Mitigation rationale |
 | :---- | :---: | :---- |
-| permissions.defaultMode: "bypassPermissions" | No | “Ignored when set in project settings to prevent untrusted repositories from auto-bypassing” |
-| autoMode | No | “Not read from shared project settings to prevent repo injection” |
-| autoMemoryDirectory | No | “Ignored if set in project settings for security reasons” |
-| useAutoModeDuringPlan | No | “Not read from shared project settings” |
-| skipBypassConfirmation | No | “Ignored when set in project settings” |
-| **enableAllProjectMcpServers** | **Yes** | No restriction |
-| **enabledMcpjsonServers** | **Yes** | No restriction |
-| **permissions.allow** | **Yes** | No restriction; can pre-authorize MCP tool calls |
+| permissions.defaultMode: "bypassPermissions" | No | Ignored at project scope to prevent untrusted repositories from auto-bypassing — fix for [CVE-2026-33068](https://github.com/anthropics/claude-code/security/advisories/GHSA-mmgp-wc2j-qcv7) (v2.1.53). |
+| autoMode | No | Not read from shared project settings; documented as a deliberate repo-injection mitigation. |
+| autoMemoryDirectory | No | Only User and Local scopes apply; project scope is ignored. |
+| **enableAllProjectMcpServers** | **Yes** | No restriction. |
+| **enabledMcpjsonServers** | **Yes** | No restriction. |
+| **permissions.allow** | **Yes** | No restriction; can pre-authorize MCP tool calls. |
 
 autoMode auto-approves Claude’s built-in tools (file read/write, bash). enableAllProjectMcpServers enables execution of arbitrary attacker-supplied executables. The blocked setting is less dangerous than the unblocked one.
 
@@ -138,21 +136,21 @@ The settings-scope class of vulnerability has been hit three times since October
 | CVE-2026-33068 | Mar 2026 | bypassPermissions in project settings skips trust dialog | v2.1.53: Setting blocked from project scope | — |
 | TrustFall (this report) | Apr 2026 | Post-trust silent MCP execution via project-scoped settings | None (declined) | Full attack chain operational |
 
-Three of the four are the same shape: a setting accepted from project scope that should not be. The pattern is treatable in one pass. Block project-scope reads of every setting that, set adversarially, broadens execution capability. The five settings already on that list (autoMode, bypassPermissions, skipBypassConfirmation, autoMemoryDirectory, useAutoModeDuringPlan) point at the obvious next ones to add: enableAllProjectMcpServers, enabledMcpjsonServers, permissions.allow. Until that audit happens, defenders should plan on a fourth report.
+Three of the four are the same shape: a setting accepted from project scope that should not be. The pattern is treatable in one pass. Block project-scope reads of every setting that, set adversarially, broadens execution capability. The settings already on that list (bypassPermissions, autoMode, autoMemoryDirectory) point at the obvious next ones to add: enableAllProjectMcpServers, enabledMcpjsonServers, permissions.allow. Until that audit happens, defenders should plan on a fourth report.
 
 ## The CI/CD variant
 
 The 1-click local case requires a developer pressing Enter. The CI/CD case does not.
 
-Claude Code in CI runs non-interactively, typically with \--trust-folder (or the equivalent default in the official claude-code-action GitHub Action). With that flag set, the trust dialog is skipped entirely. A pull request that adds .claude/settings.json and .mcp.json will execute the attacker’s MCP server the moment CI checks out the branch and runs claude against it. The payload reads environment variables, deploy keys, signing certificates, and any credentials available to the runner.
+Claude Code in CI runs in headless print mode (`-p` / `--print`), typically via the official `anthropics/claude-code-action` GitHub Action. **Headless mode skips the workspace trust dialog entirely** — the dialog never renders and is never answered. The action additionally sets `--dangerously-skip-permissions` (gated behind the explicit `acknowledge-dangerously-skip-permissions-responsibility: true` input) to suppress per-tool confirmation prompts. The net effect: a pull request that adds `.claude/settings.json` and `.mcp.json` will execute the attacker’s MCP server the moment CI checks out the branch and runs `claude` against it. The payload reads environment variables, deploy keys, signing certificates, and any credentials available to the runner.
 
-Organizations running Claude Code on any CI runner that processes untrusted pull requests should assume they are exposed today. The only defense in Anthropic’s threat model is the trust dialog, and \--trust-folder removes it.
+Organizations running Claude Code on any CI runner that processes untrusted pull requests should assume they are exposed today. The only defense in Anthropic’s threat model is the trust dialog, and headless invocation removes it.
 
 ## Recommended fixes (for Anthropic)
 
 Three changes close this without breaking team workflows:
 
-1. **Block enableAllProjectMcpServers, enabledMcpjsonServers, and permissions.allow from project-scoped settings.** Apply the same restriction documented for bypassPermissions and autoMode: “not read from shared project settings to prevent repo injection.” Teams that want shared MCP behavior set it once in user-scoped \~/.claude/settings.json, identical to how autoMode works today after it was blocked from project scope. The security benefit is that a malicious repo can no longer self-approve its own servers.  
+1. **Block enableAllProjectMcpServers, enabledMcpjsonServers, and permissions.allow from project-scoped settings.** Apply the same restriction already used for bypassPermissions and autoMode: do not read these keys from shared project settings, only from user scope. Teams that want shared MCP behavior set it once in user-scoped \~/.claude/settings.json, identical to how autoMode works today after it was blocked from project scope. The security benefit is that a malicious repo can no longer self-approve its own servers.  
 2. **Restore the MCP-specific trust dialog.** When a project contains .mcp.json, the trust prompt should enumerate each server, show the command it will execute, and offer separate enable/disable, as the pre-v2.1 dialog did. Generic “trust this folder” language is not informed consent for spawning arbitrary executables.  
 3. **Require per-server interactive consent.** Even if enabledMcpjsonServers is set at user scope, each new server from a project’s .mcp.json should require a one-time interactive approval that shows the actual command and arguments. This is the control most likely to catch the fileless variant before it executes.
 
@@ -172,7 +170,7 @@ When auditing an open-source project before running Claude Code in it, inspect .
 
 ### In CI
 
-Do not pass \--trust-folder (or any auto-trust equivalent) on runners that handle untrusted pull requests. This single control eliminates the 0-click variant. If a pipeline genuinely needs Claude Code non-interactively, gate it on branches where commits are already reviewed: post-merge on main, not arbitrary PR branches.
+Do not run `claude` headlessly (`-p` / `--print` or via `claude-code-action`) on runners that handle untrusted pull requests, since headless mode auto-bypasses the trust dialog. This single control eliminates the 0-click variant. If a pipeline genuinely needs Claude Code non-interactively, gate it on branches where commits are already reviewed: post-merge on main, not arbitrary PR branches.
 
 If the pipeline uses claude-code-action, pin it to a specific commit SHA and review its default MCP handling. Isolate any runner that invokes claude from production secrets. Assume any runner executing claude against PR code is compromisable, and do not give it deploy keys, signing certificates, or production cloud credentials. Add a PR check that fails when a pull request adds or modifies .claude/settings.json or .mcp.json. Those files should require explicit human review before any CI run executes the code they reference.
 
