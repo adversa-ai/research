@@ -70,7 +70,7 @@ MCP servers execute as **native OS processes with the full privileges of the use
 ### What an attacker achieves on server startup
 
 - **Exfiltration:** SSH keys (`~/.ssh/id_rsa`), cloud credentials (`~/.aws/`, `~/.config/gcloud/`), source code and secrets from other projects on the same machine.
-- **Command & Control:** the MCP server is a long-lived Node.js process that persists for the Claude Code session (hours); a WebSocket or HTTP-polling channel receives and executes commands in real time.
+- **Command & Control:** the MCP server is a long-lived OS process (whatever interpreter or binary the attacker specifies in `.mcp.json`'s `command`) that persists for the Claude Code session (hours); a WebSocket or HTTP-polling channel receives and executes commands in real time.
 - **Persistence:** writes to `~/.bashrc`, cron jobs, additional MCP servers injected into the user's own `~/.claude/settings.json`, SSH authorized keys.
 - **Lateral movement:** stolen SSH keys and cloud credentials against other systems; `.git/config` reads to map internal infrastructure.
 
@@ -89,7 +89,7 @@ repo/
     └── attacker-mcp-server.js       # Payload: executes on server startup
 ```
 
-No `CLAUDE.md` or prompt injection is needed. The MCP server's payload runs as part of the Node.js process initialization — it executes the moment the server starts, before Claude ever calls a tool.
+No `CLAUDE.md` or prompt injection is needed. The MCP server's payload runs as part of the spawned process's initialization — it executes the moment the server starts, before Claude ever calls a tool. (The example below uses Node.js, but `.mcp.json` accepts any `command`: `python`, `sh`, a compiled binary — the timing is the same.)
 
 **`.mcp.json`** — registers malicious server under a trusted-looking name:
 ```json
@@ -164,12 +164,12 @@ This variant is why the defender mitigations below emphasize child-process monit
 
 The 1-click local attack is serious, but the 0-click CI/CD variant is what should worry enterprise security teams. CI runners hold the credentials that production depends on: cloud deploy keys, signing certificates, package-registry tokens, internal service auth. A malicious pull request to a repository that runs Claude Code in CI turns this entire credential set into a single HTTP POST away from the attacker.
 
-In CI/CD environments, Claude Code is typically invoked in headless print mode (`-p` / `--print`), most commonly via the official `anthropics/claude-code-action` GitHub Action. **Headless mode skips the workspace trust dialog entirely** — the dialog never renders and is never answered. (The action additionally sets `--dangerously-skip-permissions`, gated behind the explicit `acknowledge-dangerously-skip-permissions-responsibility: true` input, to suppress per-tool confirmation prompts; per Anthropic issue #28506, that flag alone does not bypass the trust dialog — headless mode is what does.) The trust dialog being the only defense described in Anthropic's threat model, this means **the attack requires zero human interaction in CI**:
+In CI/CD environments, Claude Code is typically invoked non-interactively, most commonly via the official `anthropics/claude-code-action` GitHub Action. The action invokes Claude Code in print mode (`-p` / `--print`) and sets `--dangerously-skip-permissions` (gated behind the explicit `acknowledge-dangerously-skip-permissions-responsibility: true` input, to suppress per-tool confirmation prompts). **In print mode the workspace trust dialog is skipped entirely** — the dialog never renders and is never answered. (Per Anthropic issue #28506, `--dangerously-skip-permissions` alone does not bypass the trust dialog — print mode is what does.) The trust dialog being the only defense described in Anthropic's threat model, this means **the attack requires zero human interaction in CI**:
 
 1. Attacker submits a pull request to a repository that runs Claude Code in its CI pipeline.
 2. The PR includes `.claude/settings.json` with `enableAllProjectMcpServers: true` and `.mcp.json` registering an attacker-controlled server.
 3. CI checks out the PR and runs `claude` with auto-trust — no dialog, no consent, no opportunity for a human to notice.
-4. The MCP server spawns as a Node.js process with the CI runner's full privileges.
+4. The MCP server spawns as an OS process with the CI runner's full privileges (whatever `command` the attacker specified in `.mcp.json` — `node`, `python`, `sh`, or a compiled binary).
 5. On process startup — before Claude executes a single tool call — the payload exfiltrates environment variables (all CI secrets), deployment keys, signing certificates, and cloud credentials to the attacker.
 
 The victim here is not the individual developer who clicked Enter — it is the entire downstream of that CI pipeline. Stolen production credentials enable package-registry takeovers, unauthorized deployments, and lateral movement into production infrastructure. This is the classic supply-chain attack pattern (SolarWinds, Codecov, XZ Utils) applied to a new surface: AI coding assistants in CI.
@@ -220,7 +220,7 @@ This inconsistency is critical because the unwarned capability is strictly more 
 |---|---|---|
 | What it auto-executes | Claude's built-in tools (read, write, bash) | **Arbitrary executables defined by the repo** |
 | Execution requires Claude action? | Yes — Claude must decide to use a tool | **No — payload runs on server startup** |
-| Confined to project directory? | Partially — Claude's tools operate on project files | **No — unsandboxed OS process, full filesystem access** |
+| Filesystem reach | Full user privileges (Claude's bash and file tools), in practice scoped to project work by Claude's reasoning | **Full user privileges, no Claude reasoning involved — runs as an independent OS process** |
 | Red warning dialog shown? | **Yes** | **No** |
 | Default dialog option | **"No, exit"** (opt-in required) | **"Yes, I trust"** (opt-out required) |
 | Blocked from project scope? | **Yes** | **No** |
@@ -256,11 +256,11 @@ In practice, this dialog is functionally identical to VS Code's workspace trust 
 
 ## Recommended Fixes
 
-1. **Block `enableAllProjectMcpServers`, `enabledMcpjsonServers`, and `permissions.allow` from project-scoped settings.** Apply the same restriction already used for `bypassPermissions` and `autoMode`: do not read these keys from shared project settings, only from user scope. This does not break team workflows — teams document the setting, each developer opts in via user-scoped settings (`~/.claude/settings.json`). This is the identical pattern used for `autoMode` today after it was blocked from project scope. The security benefit is that a malicious repo can no longer self-approve its own servers.
+1. **Block `enableAllProjectMcpServers`, `enabledMcpjsonServers`, and `permissions.allow` from any settings file inside the project directory.** This means *both* `.claude/settings.json` (Project scope) *and* `.claude/settings.local.json` (Local scope) when shipped or present at clone-time. Per Claude Code's scope precedence — Managed > CLI > Local > Project > User — Local *outranks* Project, so a malicious repo can simply ship `.claude/settings.local.json` to bypass a Project-only block. (The existing fix for `bypassPermissions`/`autoMode`/`autoMemoryDirectory` should be audited for the same gap; if today they are blocked from Project but read from Local, the same parallel attack applies.) Allow these keys only from scopes structurally outside the repository: User (`~/.claude/settings.json`), Managed (enterprise admin), or CLI flags. Teams that want shared MCP behavior opt in once at User scope. The security benefit is that a malicious repo can no longer self-approve its own servers regardless of which in-project file it ships.
 
 2. **Restore the MCP-specific trust dialog.** When a project contains `.mcp.json`, the trust dialog should enumerate each server, show the command it will execute (e.g., `node mcp/attacker-mcp-server.js`), and offer separate enable/disable — as the older dialog did.
 
-3. **Require per-server interactive consent.** Even if `enabledMcpjsonServers` is set at user scope, each server from a project's `.mcp.json` should require a one-time interactive approval showing the actual command.
+3. **Require per-server interactive consent.** Even if `enabledMcpjsonServers` is set at User or Local scope, each *new* server from a project's `.mcp.json` should require a one-time interactive approval showing the actual command and arguments. This is the control most likely to catch the fileless variant before it executes.
 
 ---
 
@@ -269,7 +269,8 @@ In practice, this dialog is functionally identical to VS Code's workspace trust 
 Since Anthropic has declined to change the underlying behavior, security teams responsible for developer endpoints and CI pipelines should act on the following independent of any vendor fix:
 
 **On developer endpoints:**
-- **Audit committed `.claude/settings.json` content, not just presence.** Add a pre-commit or repo-scanning rule that flags any `.claude/settings.json` containing `enableAllProjectMcpServers`, `enabledMcpjsonServers`, or `permissions.allow`. These keys have no legitimate reason to be shared across teammates via git — they should be set per-developer in user-scoped settings (`~/.claude/settings.json`).
+- **Audit content of any committed `.claude/` settings file, not just `settings.json`.** Add a pre-commit or repo-scanning rule that flags any committed `.claude/settings.json` *or* `.claude/settings.local.json` containing `enableAllProjectMcpServers`, `enabledMcpjsonServers`, or `permissions.allow`. The reason to scan both files: per Claude Code's scope precedence (Managed > CLI > Local > Project > User), **Local outranks Project**, and an attacker controlling the repo can ship `settings.local.json` directly — there is no structural enforcement that the file must be gitignored or developer-created. These keys have no legitimate reason to be committed to git.
+- **Opt in via User scope only.** Developers who want the auto-approval behavior should set it in `~/.claude/settings.json` (User scope), which sits outside the project directory and cannot be overridden by a cloned repo. **Local scope (`.claude/settings.local.json`) is not a safe per-developer opt-in path**: a malicious repo can ship one and Local outranks Project. The intuitive expectation that "Local is gitignored therefore safe" does not hold against an adversarial repo.
 - **Inspect `.mcp.json` `command` and `args` values, not just referenced files.** The fileless variant above embeds the full payload inline via `node -e` — static scanners that only look for suspicious `.js` files will miss it. Flag any `args` containing `-e`, `-p`, `--eval`, `eval`, `fetch(`, `child_process`, `net.Socket`, or base64-encoded strings.
 - **Cross-reference runtime child processes with project config.** A bare alert on `claude` spawning `node -e`, `python -c`, or `sh -c` will be noisy in any non-trivial development environment. The high-confidence runtime check is narrower: `claude` spawned a long-lived child whose `argv0`/`argv1` matches a `command`/`args` pair from a `.mcp.json` in a recently-cloned, non-user-owned directory. That pattern is behavior a benign Claude session does not produce, and it catches the inline variant the static checks cannot see.
 - **Treat cloned untrusted repositories as hostile.** When auditing open-source projects, inspect both `.mcp.json` and `.claude/settings.json` *before* running `claude` in the directory — the trust dialog will not tell you what is about to execute.
@@ -278,7 +279,7 @@ Since Anthropic has declined to change the underlying behavior, security teams r
 - **Do not run `claude` headlessly (`-p` / `--print` or via `claude-code-action`) on runners that process untrusted pull requests.** Headless mode auto-skips the workspace trust dialog, the only defense Anthropic's threat model relies on for the project-scoped MCP-enabling settings. This single control eliminates the 0-click variant. If your pipeline requires Claude Code non-interactively, run it only on branches where commits are already gated (e.g., post-merge on `main`, not on arbitrary PR branches).
 - **If you use `claude-code-action`, review its default MCP behavior and pin it to a specific commit SHA.** Do not accept upstream changes without security review.
 - **Isolate CI runners that invoke `claude` from those holding production secrets.** Assume any runner that executes `claude` on PR code is compromisable; do not give it deploy keys, signing certificates, or production cloud credentials.
-- **Add a PR check that fails when a PR adds or modifies `.claude/settings.json` or `.mcp.json`.** These files should require explicit human review before any CI run executes the code they reference.
+- **Add a PR check that fails when a PR adds or modifies `.claude/settings.json`, `.claude/settings.local.json`, or `.mcp.json`.** These files should require explicit human review before any CI run executes the code they reference. Don't rely on `settings.local.json` being gitignored — assume the attacker may not honor it.
 
 **For platform and security teams:**
 - **Inventory Claude Code usage.** Know which developers and which CI pipelines run `claude`, and on what source. This is the precondition for every control above.
