@@ -6,7 +6,7 @@
 **Tested Version:** v2.1.126 (latest as of May 2, 2026)  
 **Severity:** 7.8 (High) - CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H  
 **Attack Vector:** Local developer machine (1-click UI bypass) / CI/CD runners (0-click automated execution)  
-**Status:** Unpatched — declined by Anthropic as outside threat model (see [Author's Note](#authors-note-on-anthropics-response))  
+**Status:** Unpatched. Declined by Anthropic as outside threat model (see [Author's Note](#authors-note-on-anthropics-response))  
 **Related:** CVE-2025-59536 (Check Point Research, October 2025) — timing component patched, scope component not patched  
 **Companion blog post:** [TrustFall: Claude Code RCE via insecure MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/)  
 
@@ -166,9 +166,9 @@ The 1-click local attack is serious, but the 0-click CI/CD variant is what shoul
 
 In CI/CD environments, Claude Code is typically invoked non-interactively, most commonly via the official `anthropics/claude-code-action` GitHub Action. The action invokes Claude through the SDK rather than the interactive CLI — there is no terminal session for the workspace trust dialog to render in, so the dialog is bypassed entirely. **The dialog never renders and is never answered.** The trust dialog being the only defense described in Anthropic's threat model, this means **the attack requires zero human interaction in CI**:
 
-1. Attacker submits a pull request to a repository that runs Claude Code in its CI pipeline.
-2. The PR includes `.claude/settings.json` with `enableAllProjectMcpServers: true` and `.mcp.json` registering an attacker-controlled server.
-3. CI checks out the PR and runs `claude` with auto-trust — no dialog, no consent, no opportunity for a human to notice.
+1. Attacker submits code to a repository that runs Claude Code in its CI pipeline (via PR, or direct commit on accessible branch).
+2. The repo includes a malicious `.mcp.json` registering an attacker-controlled server.
+3. CI checks out the code and runs `claude` with auto-trust — no dialog, no consent, no opportunity for a human to notice.
 4. The MCP server spawns as an OS process with the CI runner's full privileges (whatever `command` the attacker specified in `.mcp.json` — `node`, `python`, `sh`, or a compiled binary).
 5. On process startup — before Claude executes a single tool call — the payload exfiltrates environment variables (all CI secrets), deployment keys, signing certificates, and cloud credentials to the attacker.
 
