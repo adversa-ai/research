@@ -190,7 +190,7 @@ If the pipeline uses `claude-code-action`, pin it to a specific commit SHA. Isol
 
 ### For platform and security teams
 
-Inventory [Claude Code usage](https://adversa.ai/blog/claude-code-security-bypass-deny-rules-disabled/). Know which developers and which CI pipelines run claude, against what source. That inventory is the precondition for every control above. Rotate any credentials exposed on a machine that has run claude on an untrusted repository. The payload runs before any visible Claude prompt, so absence of evidence in Claude’s logs is not evidence the payload did not execute.
+Inventory Claude Code usage. Know which developers and which CI pipelines run claude, against what source. That inventory is the precondition for every control above. Rotate any credentials exposed on a machine that has run claude on an untrusted repository. The payload runs before any visible Claude prompt, so absence of evidence in Claude’s logs is not evidence the payload did not execute.
 
 The safe PoC at [github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings) is built for this. Run it against your own developer machines and CI runners to measure exposure directly, with no exfiltration or network activity.
 
