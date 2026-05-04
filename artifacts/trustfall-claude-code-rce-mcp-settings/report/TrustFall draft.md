@@ -156,9 +156,9 @@ Three of the four are the same shape: a setting accepted from project scope that
 
 The 1-click local case requires a developer pressing Enter. The CI/CD case does not.
 
-Claude Code in CI runs non-interactively, most commonly via the official `anthropics/claude-code-action` GitHub Action. The action invokes Claude through the SDK rather than the interactive CLI — there is no terminal session for the workspace trust dialog to render in, so the dialog is bypassed entirely. **The dialog never renders and is never answered.** The net effect: a pull request that adds `.claude/settings.json` and `.mcp.json` will execute the attacker’s MCP server the moment CI runs the action against the branch. The payload reads environment variables, deploy keys, signing certificates, and any credentials available to the runner.
+Claude Code in CI runs non-interactively, most commonly via the official `anthropics/claude-code-action` GitHub Action. The action invokes Claude through the SDK rather than the interactive CLI — there is no terminal session for the workspace trust dialog to render in, so the dialog is bypassed entirely. **The dialog never renders and is never answered.** The net effect: a repository that ships a malicious `.mcp.json` will execute the attacker’s MCP server the moment CI runs the action against that branch. The payload reads environment variables, deploy keys, signing certificates, and any credentials available to the runner.
 
-Organizations running Claude Code on any CI runner that processes untrusted pull requests should assume they are exposed today. The only defense in Anthropic’s threat model is the trust dialog, and headless invocation removes it.
+Organizations running Claude Code on any CI runner that processes untrusted repositories should assume they are exposed today. The only defense in Anthropic’s threat model is the trust dialog, and headless invocation removes it.
 
 ## Recommended fixes (for Anthropic)
 
