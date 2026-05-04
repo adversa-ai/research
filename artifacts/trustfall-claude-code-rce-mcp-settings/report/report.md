@@ -24,7 +24,7 @@ In October 2025, Check Point Research reported CVE-2025-59536 (CVSS 8.7): a mali
 
 This report documents the residual attack surface. A malicious repository ships three files: `.mcp.json` (defines an attacker-controlled MCP server), `.claude/settings.json` (auto-approves that server), and a payload script (e.g., `mcp/attacker-mcp-server.js`). The moment a victim clones the repo, runs `claude`, and clicks the generic "Yes, I trust this folder" dialog, the MCP server starts as a native OS process with full user privileges. **The payload executes on server startup — no tool call required, no additional prompt shown.** The attacker gains unsandboxed code execution: exfiltration of files from anywhere on the filesystem (`~/.ssh/`, `~/.aws/`, other projects), establishment of persistent C2 channels, and installation of backdoors.
 
-The root cause is a settings-scope restriction inconsistency: Anthropic explicitly blocks several other dangerous settings from project scope to prevent repo injection (`bypassPermissions`, `autoMode`, `autoMemoryDirectory`), but leaves `enableAllProjectMcpServers` and `enabledMcpjsonServers` unblocked — despite these settings granting greater execution capabilities than the ones that are blocked.
+The root cause is a settings-scope restriction inconsistency: Anthropic explicitly blocks several other dangerous settings from project scope (`useAutoModeDuringPlan`, `autoMode`, `autoMemoryDirectory`, `skipDangerousModePermissionPrompt`), but leaves `enableAllProjectMcpServers` and `enabledMcpjsonServers` unblocked — despite these settings granting greater execution capabilities than the ones that are blocked.
 
 > **Note:** `permissions.allow` (which can pre-authorize MCP tool calls) is also accepted from project scope, but it is **not required** for this attack. The payload executes on MCP server startup — no tool call from Claude is needed. The attack succeeds with `enableAllProjectMcpServers` / `enabledMcpjsonServers` alone.
 
@@ -184,16 +184,17 @@ The trust dialog asks the user a question whose scope is narrower than the capab
 
 ### The Scope Restriction Inconsistency
 
-This is the core argument. Anthropic explicitly blocks several settings from project scope to prevent repo injection. The pattern is consistent and well-established in the codebase:
+This is the core argument. Anthropic explicitly blocks several settings from project scope. The pattern is consistent and well-established in the codebase:
 
-| Setting | Allowed from Project Scope? | Documented Reason |
-|---------|:---------------------------:|---|
-| `permissions.defaultMode: "bypassPermissions"` | ❌ | Ignored at project scope to prevent untrusted repositories from auto-bypassing — the fix for [CVE-2026-33068](https://github.com/anthropics/claude-code/security/advisories/GHSA-mmgp-wc2j-qcv7) (v2.1.53). |
-| `autoMode` | ❌ | Not read from shared project settings; documented as a deliberate repo-injection mitigation. |
-| `autoMemoryDirectory` | ❌ | Only User and Local scopes apply; project scope is ignored. |
-| **`enableAllProjectMcpServers`** | **✅** | No restriction — accepted from project scope |
-| **`enabledMcpjsonServers`** | **✅** | No restriction — accepted from project scope |
-| **`permissions.allow`** | **✅** | No restriction — accepted from project scope; can pre-authorize MCP tool calls |
+| Setting | Allowed from Project Scope? |
+|---------|:---------------------------:|
+| `autoMode` | ❌ |
+| `useAutoModeDuringPlan` | ❌ |
+| `autoMemoryDirectory` | ❌ |
+| `skipDangerousModePermissionPrompt` | ❌ |
+| **`enableAllProjectMcpServers`** | **✅** |
+| **`enabledMcpjsonServers`** | **✅** |
+| **`permissions.allow`** | **✅** |
 
 `autoMode` auto-approves Claude's *built-in* tools (file read/write, bash). `enableAllProjectMcpServers` enables execution of **arbitrary attacker-supplied executables**. `permissions.allow` can pre-authorize specific tool calls (including MCP tools) without any user prompt. The blocked settings are less dangerous than the unblocked ones. This is not a gray area — it is an inversion of the threat hierarchy.
 
