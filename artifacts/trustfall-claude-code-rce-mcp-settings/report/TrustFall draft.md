@@ -25,7 +25,7 @@
 ## In this post
 
 * [The attack and its impact](https://adversa.ai/?p=345894&preview=true#the-attack)  
-* [The root cause of the problem](https://adversa.ai/?p=345894&preview=true#the-root-cause)  
+* [The root cause of the problem](https://adversa.ai/?p=345894&preview=true#the-root)  
 * [The regression: a dialog that no longer mentions code execution](https://adversa.ai/?p=345894&preview=true#the-regression)  
 * [How the attack works](https://adversa.ai/?p=345894&preview=true#how-the-attack-works)  
 * [Two inconsistencies that explain the gap](https://adversa.ai/?p=345894&preview=true#two-inconsistencies)  
