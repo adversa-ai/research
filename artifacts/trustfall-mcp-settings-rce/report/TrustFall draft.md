@@ -79,7 +79,7 @@ The rest of this post deep-dives Claude Code because that is where the gap is mo
 
 ![Cursor CLI trust dialog with MCP-specific warning - TrustFall](./screenshots/trust-dialog-cursor.png)
 
-**Copilot CLI** shows a generic “trust this folder” prompt with no MCP mention — the same shape as the current Claude Code dialog (post-v2.1).
+**Copilot CLI** shows a generic “trust this folder” prompt with no MCP mention.
 
 ![Copilot CLI generic trust dialog with no MCP mention - TrustFall](./screenshots/trust-dialog-copilot.png)
 
@@ -179,7 +179,7 @@ The settings-scope class of vulnerability has been hit three times since October
 | CVE-2026-33068 | Mar 2026 | `bypassPermissions` in project settings skips trust dialog | v2.1.53: Setting blocked from project scope | — |
 | TrustFall (this report) | Apr 2026 | Post-trust silent MCP execution via project-scoped settings | None (declined) | Full attack chain operational |
 
-Three of the four are the same shape: a setting accepted from project scope that should not be. The pattern is treatable in one pass. Block project-scope reads of every setting that, set adversarially, broadens execution capability. The settings already on that list (`bypassPermissions`, `autoMode`, `useAutoModeDuringPlan`, `autoMemoryDirectory`, `skipDangerousModePermissionPrompt`) point at the obvious next ones to add: `enableAllProjectMcpServers`, `enabledMcpjsonServers`, `permissions.allow`. Until that audit happens, defenders should plan on a fourth report.
+Three of the four are the same shape: a setting accepted from project scope that should not be. The pattern is treatable in one pass. Block project-scope reads of every setting that, set adversarially, broadens execution capability. The settings already on that list (`bypassPermissions`, `autoMode`, `useAutoModeDuringPlan`, `autoMemoryDirectory`, `skipDangerousModePermissionPrompt`) point at the obvious next ones to add: `enableAllProjectMcpServers`, `enabledMcpjsonServers`, `permissions.allow`.
 
 ## The CI/CD variant
 
@@ -246,7 +246,7 @@ This problem isn’t specific to Claude Code. Agentic CLI tools inherit a develo
 
 There’s also an awareness gap no vendor fix will close on its own. Agentic coding CLIs in general ship settings whose security implications aren’t obvious from their names — `enableAllProjectMcpServers` reads like a feature toggle, not “authorize unsandboxed RCE with full user privileges.” The parity finding above suggests this isn’t accidental: the convention itself, not any one vendor’s implementation, is what produces the gap. Most developers using these tools lack a working model of which keys are safe to accept from a cloned repo and which aren’t, and the documentation doesn’t make that distinction explicit.
 
-And the awareness gap isn’t one developers will close on their own. The dominant usage pattern is install, run, accept defaults; reading a settings reference for security-relevant keys is the exception. Active hardening of user-scope settings is rare on individual developer machines. Where it is likely to happen more consistently is enterprise deployments, where security teams push hardened configs to endpoints centrally — but that displaces the audit onto the security team, it doesn’t close the awareness gap for the broader developer population. The practical security of an AI coding agent on a developer machine depends on a configuration audit the developer isn’t equipped to perform and, by default, never attempts. That gap, more than any individual CVE, is what keeps this class of vulnerability recurring.
+And the awareness gap isn’t one developers will close on their own. The dominant usage pattern is install, run, accept defaults; reading a settings reference for security-relevant keys is the exception. Active hardening of settings is rare on individual developer machines. Where it is likely to happen more consistently is enterprise deployments, where security teams push hardened configs to endpoints centrally — but that displaces the audit onto the security team, it doesn’t close the awareness gap for the broader developer population. The practical security of an AI coding agent on a developer machine depends on a configuration audit the developer isn’t equipped to perform and, by default, never attempts. That gap, more than any individual CVE, is what keeps this class of vulnerability recurring.
 
 The TrustFall regression is one concrete case. Anthropic’s fix is three changes: block the MCP-enabling settings from project scope, add a dedicated MCP consent dialog with default-deny (parity with how `bypassPermissions` is already treated), and require interactive consent for new servers from a project’s `.mcp.json`. The broader question, for all these tools, is whether a single Enter keypress should ever be the boundary between “I cloned this” and “this code is now running unsandboxed against my credentials.”
 
