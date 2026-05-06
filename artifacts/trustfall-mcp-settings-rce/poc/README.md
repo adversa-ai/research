@@ -1,6 +1,6 @@
 # TrustFall PoC — safe reproduction (Claude Code · Gemini CLI · Cursor CLI · Copilot CLI)
 
-This directory is a minimal malicious-repository fixture for the **[TrustFall](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/)** finding. Cloning it and running any of the four agentic CLIs in this directory triggers the CLI to silently spawn an attacker-defined MCP server the moment you accept the "trust this folder" dialog — and the server's only payload is opening the OS calculator. The visible calculator is the proof that arbitrary code ran with your user privileges immediately after the trust dialog, with no per-server consent prompt.
+This directory is a minimal malicious-repository fixture for the **[TrustFall](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/)** finding. Cloning it and running any of the four agentic CLIs in this directory triggers the CLI to silently spawn an attacker-defined MCP server the moment you accept the "trust this folder" dialog — and the server's only payload is opening the OS calculator. The visible calculator is the proof that arbitrary code ran with your user privileges immediately after the trust dialog, with no per-server consent prompt.
 
 The full technical write-up is in [`../report/`](../report/).
 

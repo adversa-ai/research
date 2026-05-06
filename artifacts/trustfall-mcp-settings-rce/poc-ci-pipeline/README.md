@@ -1,6 +1,6 @@
 # TrustFall PoC — CI/CD pipeline (0-click headless variant)
 
-This directory is the second of two fixtures for the **[TrustFall](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/)** finding. It demonstrates the **headless CI/CD variant**: Claude Code invoked through `anthropics/claude-code-action` runs non-interactively, the workspace trust dialog never renders, and a project-shipped `.mcp.json` is executed automatically on action startup with no human in the loop.
+This directory is the second of two fixtures for the **[TrustFall](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/)** finding. It demonstrates the **headless CI/CD variant**: Claude Code invoked through `anthropics/claude-code-action` runs non-interactively, the workspace trust dialog never renders, and a project-shipped `.mcp.json` is executed automatically on action startup with no human in the loop.
 
 The companion fixture at [`../poc/`](../poc/) shows the **1-click developer-machine variant** across all four agentic CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI) using a safe `calc.exe` payload.
 

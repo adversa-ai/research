@@ -1,15 +1,15 @@
 # TrustFall: 1-Click RCE in Claude Code via Project-Scoped MCP Auto-Approval
 
-*Technical reference for the TrustFall finding in Claude Code: reproduction detail, settings inventory, and operational mitigations. The design critique and the back-and-forth with Anthropic are in the [companion blog post](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/). TrustFall is a class-level finding confirmed across Claude Code, Gemini CLI, Cursor CLI, and Copilot CLI; this document deep-dives Claude Code.*
+*Technical reference for the TrustFall finding in Claude Code: reproduction detail, settings inventory, and operational mitigations. The design critique and the back-and-forth with Anthropic are in the [companion blog post](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/). TrustFall is a class-level finding confirmed across Claude Code, Gemini CLI, Cursor CLI, and Copilot CLI; this document deep-dives Claude Code.*
 
 **Researcher:** Adversa AI (Rony Utevsky)  
 **Finding Class:** Settings-scope restriction gap → silent arbitrary code execution  
 **Affected Product:** Claude Code CLI (Anthropic) — primary deep dive; parity confirmed in Gemini CLI, Cursor CLI, Copilot CLI  
 **Tested Version:** Claude Code v2.1.129 (latest as of May 2026)  
 **Affected Surfaces:** Local developer machine (1-click UI bypass) / CI/CD runners (0-click automated execution)  
-**Status:** Acknowledged by Anthropic as design intent — see [companion blog post](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/) for the full position  
+**Status:** Acknowledged by Anthropic as design intent — see [companion blog post](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/) for the full position  
 **Related:** CVE-2025-59536 (Check Point Research, October 2025) — timing component patched, scope-restriction gap under the same convention not revisited  
-**Companion blog post:** [TrustFall: One-keypress RCE in agentic coding CLIs via project-scoped MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/)
+**Companion blog post:** [TrustFall: One-keypress RCE in agentic coding CLIs via project-scoped MCP settings](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/)
 
 ---
 
@@ -185,7 +185,7 @@ Stolen production credentials enable package-registry takeovers, unauthorized de
 
 ## Settings Reference
 
-The two tables below document the relevant settings and how Claude Code treats them. The design-critique argument for why the asymmetry matters is in the [companion blog post](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/).
+The two tables below document the relevant settings and how Claude Code treats them. The design-critique argument for why the asymmetry matters is in the [companion blog post](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/).
 
 ### Project-scope acceptance
 
@@ -220,19 +220,19 @@ The two tables below document the relevant settings and how Claude Code treats t
 
 > "Quick safety check: Is this a project you created or one you trust? Claude Code'll be able to read, edit, and execute files here."
 
-The dialog does not enumerate MCP servers, mention `.mcp.json`, or offer a per-MCP opt-out. The pre-v2.1 dialog did all of these — see the [companion blog post](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/) for the regression detail and screenshots.
+The dialog does not enumerate MCP servers, mention `.mcp.json`, or offer a per-MCP opt-out. The pre-v2.1 dialog did all of these — see the [companion blog post](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/) for the regression detail and screenshots.
 
 ---
 
 ## Recommended Design Changes
 
-The full argument is in the [companion blog post](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/). In brief, the changes that would close the Claude Code chain are:
+The full argument is in the [companion blog post](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/). In brief, the changes that would close the Claude Code chain are:
 
 1. **Block `enableAllProjectMcpServers`, `enabledMcpjsonServers`, and `permissions.allow` from any in-project settings file.** That means *both* `.claude/settings.json` (Project scope) *and* `.claude/settings.local.json` (Local scope) — per Claude Code's scope precedence (Managed > CLI > Local > Project > User), Local outranks Project, so a malicious repo can ship `settings.local.json` to bypass a Project-only block. Allow these keys only from User, Managed, or CLI-flag scope. The existing scope restriction for `bypassPermissions`/`autoMode`/`useAutoModeDuringPlan`/`autoMemoryDirectory`/`skipDangerousModePermissionPrompt` should be audited for the same Local-scope gap.
 2. **Add a dedicated MCP/hooks consent dialog with default deny** — parity with how `bypassPermissions` is treated.
 3. **Require per-server interactive consent** for new MCP servers from a project's `.mcp.json` (default: disabled).
 
-For the broader convention across all four CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI), see the [companion blog post](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/).
+For the broader convention across all four CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI), see the [companion blog post](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/).
 
 ---
 
