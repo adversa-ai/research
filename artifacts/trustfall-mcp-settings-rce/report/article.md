@@ -16,9 +16,8 @@
 
 | Researcher: | Rony Utevsky (Adversa AI) |
 | :---- | :---- |
-| **Affected:** | Four agentic coding CLIs: Claude Code (v2.1.126, primary deep dive), Gemini CLI, Cursor CLI, Copilot CLI. Same one-keypress chain across all four; different dialog wording. |
-| **Severity:** | CVSS 7.8 (High) — CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H |
-| **Status:** | Unpatched. Declined by Anthropic as outside threat model. See appendix for full position. |
+| **Affected:** | Claude Code (v2.1.126, primary deep dive). Parity confirmed in Gemini CLI, Cursor CLI, Copilot CLI. |
+| **Status:** | Declined by Anthropic as outside threat model. See appendix for full position. |
 | **Proof of concept and full report:** | [github.com/adversa-ai/research/tree/main/artifacts/trustfall-mcp-settings-rce](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-mcp-settings-rce) — two fixtures plus the full technical report. [`poc/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-mcp-settings-rce/poc) is the 1-click developer-machine variant (opens the OS calculator, works on all four CLIs); [`poc-ci-pipeline/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-mcp-settings-rce/poc-ci-pipeline) is the 0-click headless CI variant (exfiltrates `process.env` from a GitHub Actions runner to a collector URL you choose). |
 
 **A note on Anthropic's position before you read further.** Anthropic's security team reviewed this report and declined it as outside their threat model: under their model, accepting "Yes, I trust this folder" constitutes consent to the full project configuration, and post-trust-dialog execution is the boundary functioning as designed. We do not contest where they have drawn that boundary. What this post documents is the informed-consent gap *inside* it — the dialog the user actually sees in v2.1+ does not say what it is asking permission for, and three project-scoped settings can silently spawn arbitrary executables behind it. The full back-and-forth on Anthropic's threat-model position is in [Appendix C](https://adversa.ai/?p=345894&preview=true#appendix-c).
@@ -37,7 +36,9 @@
   * [Warning-dialog inconsistency](https://adversa.ai/?p=345894&preview=true#warning-dialog)  
 * [The pattern: third CVE in six months](https://adversa.ai/?p=345894&preview=true#the-pattern)  
 * [The CI/CD variant](https://adversa.ai/?p=345894&preview=true#the-cicd-variant)  
-* [Recommended fixes (for Anthropic)](https://adversa.ai/?p=345894&preview=true#recommended-fixes)  
+* [Recommended fixes](https://adversa.ai/?p=345894&preview=true#recommended-fixes)  
+  * [For Claude Code](https://adversa.ai/?p=345894&preview=true#recommended-fixes-claude)
+  * [For the broader ecosystem](https://adversa.ai/?p=345894&preview=true#recommended-fixes-ecosystem)
 * [What defenders can do today](https://adversa.ai/?p=345894&preview=true#what-defenders-can-do)  
   * [On developer endpoints](https://adversa.ai/?p=345894&preview=true#on-developer-endpoints)  
   * [In CI](https://adversa.ai/?p=345894&preview=true#in-ci)  
@@ -59,7 +60,9 @@ The impact is full machine compromise, not just project access. MCP servers exec
 
 ## TrustFall isn’t unique to Claude Code
 
-Our scope was the Claude Code-specific chain, but we ran a parity check across three comparable agentic CLIs alongside it. **All four — Claude Code, Gemini CLI, Cursor CLI, Copilot CLI — execute project-defined MCP servers immediately after the user accepts the folder-trust prompt.** A cloned repo can auto-approve attacker-controlled execution paths in each, and all four default to “Yes/Trust,” so one Enter keypress is sufficient to cause RCE.
+Our scope started with Claude Code. The parity check across Gemini CLI, Cursor CLI, and Copilot CLI happened during publication prep, after Anthropic's response — and the result of that check is what reframed this from "a Claude Code regression" to "a convention shared across agentic CLIs." Once we identified the issue as a class-level convention rather than a per-vendor bug, vendor-specific disclosure stopped being the right shape of response: you can responsibly disclose a vulnerability to one vendor, but not a convention.
+
+**All four — Claude Code, Gemini CLI, Cursor CLI, Copilot CLI — execute project-defined MCP servers immediately after the user accepts the folder-trust prompt.** A cloned repo can auto-approve attacker-controlled execution paths in each, and all four default to “Yes/Trust,” so one Enter keypress is sufficient to cause RCE.
 
 The rest of this post deep-dives Claude Code because that is where the gap is most acute: its trust dialog is one of the two generic ones (no MCP mention) and it ships *three* project-scoped settings (`enableAllProjectMcpServers`, `enabledMcpjsonServers`, `permissions.allow`) whose security implications the dialog never discloses. The CLIs differ only in how the trust dialog frames the authorization; the variation is informed-consent UX, not exposure.
 
@@ -194,8 +197,9 @@ The screenshot below shows the result against a test repo we own: a single POST 
 
 ![webhook.site receiving a POST with the GitHub Actions runner's process.env, including a planted TOP_SECRET_KEY - TrustFall CI/CD variant](./screenshots/env_exfil_ci_pipeline.jpg)
 
-## Recommended fixes (for Anthropic)
+## Recommended fixes
 
+### For Claude Code
 Three changes close this without breaking team workflows:
 
 1. **Block `enableAllProjectMcpServers`, `enabledMcpjsonServers`, and `permissions.allow` from any settings file inside the project.** Allow these keys only from scopes structurally outside the repository: User (`~/.claude/settings.json`), Managed (enterprise admin), or CLI flags. Teams that want shared MCP behavior opt in once at User scope.
@@ -204,6 +208,12 @@ Three changes close this without breaking team workflows:
    - The security benefit: a malicious repo can no longer self-approve its own servers regardless of which in-project file it ships.  
 2. **Add a dedicated MCP consent dialog with default deny.** MCP servers spawn arbitrary attacker-defined processes with the user’s full privileges — the same blast radius as `bypassPermissions`. Treat them the same way: a dedicated dialog after folder trust, “No, exit” default, explicit risk language. The pre-v2.1 wording (warn that `.mcp.json` could execute code, offer an opt-out) is the minimum bar.  
 3. **Require per-server interactive consent.** Even if `enabledMcpjsonServers` is set at User or Local scope, each *new* server from a project’s `.mcp.json` should require a one-time interactive approval gated per server name (default: disabled).
+
+### For the broader ecosystem
+
+Three convention-level changes would close the gap across all four CLIs. Folder trust should not, by itself, authorize spawning attacker-defined OS processes — MCP-server enablement deserves its own dialog with a deny default, the way Cursor CLI already approximates. The dialog should enumerate what's about to start, the way Gemini CLI already does. And settings that enable arbitrary unsandboxed code from project files should not be readable from project scope at all — they belong outside the cloned repo's control, at user, managed, or CLI-flag scope.
+
+These are convention-level changes, not vendor-specific bugs. The CLIs that do better on individual axes — Gemini on enumeration, Cursor on MCP-specific warnings — point at what "better" looks like in practice.
 
 ## What defenders can do today
 
