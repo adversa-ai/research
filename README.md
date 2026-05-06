@@ -18,7 +18,7 @@ artifacts/
 
 | Artifact | Topic | Blog post |
 |---|---|---|
-| [`artifacts/trustfall-mcp-settings-rce/`](artifacts/trustfall-mcp-settings-rce/) | Project-scoped MCP auto-approval enables 1-click RCE across four agentic CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI); 0-click in Claude Code CI via `claude-code-action`. Claude Code deep-dive — incomplete CVE-2025-59536 fix. | [TrustFall: Claude Code RCE via insecure MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/) |
+| [`artifacts/trustfall-mcp-settings-rce/`](artifacts/trustfall-mcp-settings-rce/) | Project-scoped MCP auto-approval enables 1-click RCE across four agentic CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI); 0-click in Claude Code CI via `claude-code-action`. Same project-scoped settings convention as CVE-2025-59536; classified by Anthropic as design intent. | [TrustFall: One-keypress RCE in agentic coding CLIs via project-scoped MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/) |
 
 ## Disclosure posture
 
