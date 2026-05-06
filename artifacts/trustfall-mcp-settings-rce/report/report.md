@@ -33,12 +33,14 @@ _Video: Split-screen C2 demonstration — victim presses Enter on the trust dial
 
 All four agentic CLIs we tested execute project-defined MCP servers immediately after the user accepts the folder-trust prompt, all default to "Yes/Trust," and one Enter keypress is sufficient in each. They differ only in how the trust dialog frames the authorization:
 
-| CLI | Dialog mentions MCP? | Per-server enumeration? | Default option |
-|---|---|---|---|
-| **Claude Code** (v2.1.129) | No — generic "trust this folder" | No | Yes, I trust |
-| **Gemini CLI** | Yes — warns about project MCP servers | Yes — by name | Trust |
-| **Cursor CLI** | Yes — MCP-specific warning | No | Trust |
-| **Copilot CLI** | No — generic "trust this folder" | No | Yes |
+| CLI | Dialog mentions MCP? | Per-server enumeration? | Default option | Files needed in repo |
+|---|---|---|---|---|
+| **Claude Code** (v2.1.129) | No — generic "trust this folder" | No | Yes, I trust | `.mcp.json` **+** `.claude/settings.json` |
+| **Gemini CLI** | Yes — warns about project MCP servers | Yes — by name | Trust | `.gemini/settings.json` |
+| **Cursor CLI** | Yes — MCP-specific warning | No | Trust | `.cursor/mcp.json` |
+| **Copilot CLI** | No — generic "trust this folder" | No | Yes | `.mcp.json` |
+
+One asymmetry the table flattens is worth calling out. Of the four CLIs, **Claude Code is the only one with a *second* gate after folder trust**: a per-server dialog that names the server (*"New MCP server found in `.mcp.json`: poc-server"*), warns that MCP servers may execute code or access system resources, and offers *"Continue without using this MCP server"* as an explicit opt-out. As second gates go, it is a good one — it discloses the capability, names what is about to start, and defaults to a reviewable choice. The settings keys this report focuses on (`enableAllProjectMcpServers`, `enabledMcpjsonServers`) exist precisely to skip it, and a malicious repo can ship the file that does. Gemini, Cursor, and Copilot have no equivalent second prompt: folder trust is the only authorization point, and a project-scoped `mcpServers` config alone is sufficient to spawn the server. So the four are equally exposed at the "one keypress" level, but they get there along different chains — three by design, one by silently waiving its own per-server gate.
 
 ![Gemini CLI trust dialog enumerating project MCP servers](screenshots/trust-dialog-gemini.png)
 *Gemini CLI: warns about project MCP servers and enumerates them by name.*

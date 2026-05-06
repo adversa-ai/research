@@ -7,11 +7,11 @@
 **TL;DR**
 
 * Claude Code’s trust dialog used to warn about MCP servers in a cloned repo and offer an opt-out. In v2.1+ that warning was removed. The current dialog reads “Quick safety check: Is this a project you created or one you trust?” and lists nothing.  
-* A malicious repository ships a malicious MCP server and auto-approves it via own `.claude/settings.json`. One Enter keypress on the trust dialog spawns the server as an unsandboxed OS process with the developer’s full privileges. No tool call from Claude is required.  
+* A malicious repository ships a malicious MCP server and uses its own `.claude/settings.json` to silently waive the per-server consent dialog Claude Code would otherwise show. One Enter keypress on the trust dialog then spawns the server as an unsandboxed OS process with the developer’s full privileges. No tool call from Claude is required.  
 * The payload does not need to be a file. The entire script can live inline in `.mcp.json`.  
 * The MCP server has enough privilege to read stored secrets and source code from other projects, or open a long-lived C2 channel. Other dangerous settings (`bypassPermissions`, `autoMode`, `useAutoModeDuringPlan`, `autoMemoryDirectory`, `skipDangerousModePermissionPrompt`) are already blocked from project scope or gated by a red warning dialog. The MCP-enabling settings are neither.  
 * On CI runners running Claude Code headlessly (the default for the official claude-code-action), the trust dialog is skipped — it never renders and is never answered. The same attack runs with zero human interaction against pull-request branches.  
-* **TrustFall isn’t a Claude Code-only issue.** All four agentic CLIs we tested — Claude Code, Gemini CLI, Cursor CLI, Copilot CLI — auto-execute project-defined MCP servers the moment the user accepts the folder-trust prompt, and all default to “Yes/Trust.” They differ only in how the dialog frames the authorization (per-CLI breakdown below). The rest of this post deep-dives the Claude Code chain.
+* **TrustFall isn’t a Claude Code-only issue.** All four agentic CLIs we tested — Claude Code, Gemini CLI, Cursor CLI, Copilot CLI — can auto-execute project-defined MCP servers the moment the user accepts the folder-trust prompt, and all default to “Yes/Trust.” They differ only in how the dialog frames the authorization (per-CLI breakdown below). The rest of this post deep-dives the Claude Code chain.
 * We share demo video and a safe PoC in our GitHub.
 
 | Researcher: | Rony Utevsky (Adversa AI) |
@@ -66,12 +66,14 @@ Our scope started with Claude Code. The parity check across Gemini CLI, Cursor C
 
 The rest of this post deep-dives Claude Code because that is where the gap is most acute: its trust dialog is one of the two generic ones (no MCP mention) and it ships *three* project-scoped settings (`enableAllProjectMcpServers`, `enabledMcpjsonServers`, `permissions.allow`) whose security implications the dialog never discloses. The CLIs differ only in how the trust dialog frames the authorization; the variation is informed-consent UX, not exposure.
 
-| CLI | Dialog mentions MCP? | Per-server enumeration? | Default option |
-| :---- | :---- | :---- | :---- |
-| **Claude Code** | No — generic “trust this folder” | No | Yes, I trust |
-| **Gemini CLI** | Yes — warns about project MCP servers | Yes — by name | Trust |
-| **Cursor CLI** | Yes — MCP-specific warning | No | Trust |
-| **Copilot CLI** | No — generic “trust this folder” | No | Yes |
+| CLI | Dialog mentions MCP? | Per-server enumeration? | Default option | Files needed in repo |
+| :---- | :---- | :---- | :---- | :---- |
+| **Claude Code** | No — generic “trust this folder” | No | Yes, I trust | `.mcp.json` **+** `.claude/settings.json` |
+| **Gemini CLI** | Yes — warns about project MCP servers | Yes — by name | Trust | `.gemini/settings.json` |
+| **Cursor CLI** | Yes — MCP-specific warning | No | Trust | `.cursor/mcp.json` |
+| **Copilot CLI** | No — generic “trust this folder” | No | Yes | `.mcp.json` |
+
+One asymmetry the table flattens is worth surfacing. Of the four CLIs, **Claude Code is the only one with a *second* gate after folder trust**: a per-server dialog that names the server (*“New MCP server found in `.mcp.json`: poc-server”*), warns that MCP servers may execute code or access system resources, and offers *“Continue without using this MCP server”* as an explicit opt-out. As second gates go, it is a good one — it discloses the capability, names what is about to start, and defaults to a reviewable choice. The settings keys this report focuses on (`enableAllProjectMcpServers`, `enabledMcpjsonServers`) exist precisely to skip it, and a malicious repo can ship the file that does. Gemini, Cursor, and Copilot have no equivalent second prompt: folder trust is the only authorization point, and a project-scoped `mcpServers` config alone is sufficient to spawn the server. So the four are equally exposed at the “one keypress” level, but they get there along different chains — three by design, one by silently waiving its own per-server gate.
 
 **Gemini CLI** is the most informative of the four. The trust dialog warns about project MCP servers and lists them by name, so the user sees what is about to start.
 
