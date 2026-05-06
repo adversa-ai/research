@@ -1,0 +1,24 @@
+name: Claude Code MCP env exfil PoC in CI Pipeline
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  claude-task:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: "Analyze the project for security risks."
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

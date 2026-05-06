@@ -1,11 +1,12 @@
 # TrustFall: Claude Code RCE via insecure MCP settings
 
-**A regression in the Claude Code trust dialog and a settings-scope inconsistency mean a malicious repository can spawn unsandboxed code with one keypress, and on CI runners with none.**
+**Four agentic coding CLIs — Claude Code, Gemini CLI, Cursor CLI, Copilot CLI — all execute project-defined MCP servers the moment a developer accepts the folder-trust prompt. A cloned repo can spawn unsandboxed code with one keypress, and against CI runners with none. This report deep-dives the Claude Code chain, where a trust dialog regression and a settings-scope inconsistency make the gap most acute.**
 
 ---
 
 **TL;DR**
 
+* **TrustFall isn’t a Claude Code-only bug.** All four agentic CLIs we tested — Claude Code, Gemini CLI, Cursor CLI, and Copilot CLI — auto-execute project-defined MCP servers the moment the user accepts the folder-trust prompt. All four default to “Yes/Trust,” so one Enter keypress is sufficient for RCE in each. They differ only in how the dialog frames the authorization: Gemini enumerates the servers by name, Cursor shows an MCP-specific warning without enumeration, Copilot and current Claude Code show a generic prompt with no MCP mention. The rest of this post deep-dives the Claude Code chain.
 * Claude Code’s trust dialog used to warn about MCP servers in a cloned repo and offer an opt-out. In v2.1+ that warning was removed. The current dialog reads “Quick safety check: Is this a project you created or one you trust?” and lists nothing.  
 * A malicious repository ships a malicious MCP server and auto-approves it via own `.claude/settings.json`. One Enter keypress on the trust dialog spawns the server as an unsandboxed OS process with the developer’s full privileges. No tool call from Claude is required.  
 * The payload does not need to be a file. The entire script can live inline in `.mcp.json`.  
@@ -15,16 +16,17 @@
 
 | Researcher: | Rony Utevsky (Adversa AI) |
 | :---- | :---- |
-| **Affected:** | Claude Code CLI, tested on v2.1.126 (latest as of May 2, 2026) |
+| **Affected:** | Claude Code CLI (v2.1.126, latest as of May 2, 2026) — primary deep dive. Parity confirmed in Gemini CLI, Cursor CLI, and Copilot CLI: same one-keypress chain, different dialog wording. |
 | **Severity:** | CVSS 7.8 (High) — CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H |
 | **Status:** | Unpatched. This variant of CVE-2026-21852 is weaponized via CI/CD headless execution and dialog regression. Declined by Anthropic as outside threat model. See appendix for full position. |
-| **Proof of concept and full report:** | [github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings) — safe, non-exfiltrating reproduction (opens the OS calculator) plus the full technical report. |
+| **Proof of concept and full report:** | [github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings) — two fixtures plus the full technical report. [`poc/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings/poc) is the 1-click developer-machine variant (opens the OS calculator, works on all four CLIs); [`poc-ci-pipeline/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings/poc-ci-pipeline) is the 0-click headless CI variant (exfiltrates `process.env` from a GitHub Actions runner to a collector URL you choose). |
 
 ---
 
 ## In this post
 
 * [The attack and its impact](https://adversa.ai/?p=345894&preview=true#the-attack)  
+* [TrustFall isn’t unique to Claude Code](https://adversa.ai/?p=345894&preview=true#trustfall-everywhere)  
 * [The root cause of the problem](https://adversa.ai/?p=345894&preview=true#the-root)  
 * [The regression: a dialog that no longer mentions code execution](https://adversa.ai/?p=345894&preview=true#the-regression)  
 * [How the attack works](https://adversa.ai/?p=345894&preview=true#how-the-attack-works)  
@@ -53,6 +55,35 @@ A malicious attacker can create a package that exploits a vulnerability in Claud
 The moment a victim clones the repo, runs `claude`, and clicks the generic “Yes, I trust this folder” dialog, the MCP server starts as a native OS process with full user privileges. The payload executes on server startup — no tool call required, no additional prompt shown.
 
 The impact is full machine compromise, not just project access. MCP servers execute as native OS processes with the full privileges of the user running Claude Code. They are not sandboxed, not confined to the project directory, and not restricted to any subset of the filesystem or network. The payload runs the moment the MCP server process starts.
+
+## TrustFall isn’t unique to Claude Code
+
+Our scope was the Claude Code-specific chain, but we ran a parity check across three comparable agentic CLIs alongside it. **All four — Claude Code, Gemini CLI, Cursor CLI, Copilot CLI — execute project-defined MCP servers immediately after the user accepts the folder-trust prompt.** A cloned repo can auto-approve attacker-controlled execution paths in each, and all four default to “Yes/Trust,” so one Enter keypress is sufficient to cause RCE.
+
+The CLIs differ only in how the trust dialog frames that authorization. The variation is informed-consent UX, not exposure.
+
+| CLI | Dialog mentions MCP? | Per-server enumeration? | Default option |
+| :---- | :---- | :---- | :---- |
+| **Claude Code** | No — generic “trust this folder” | No | Yes, I trust |
+| **Gemini CLI** | Yes — warns about project MCP servers | Yes — by name | Trust |
+| **Cursor CLI** | Yes — MCP-specific warning | No | Trust |
+| **Copilot CLI** | No — generic “trust this folder” | No | Yes |
+
+**Gemini CLI** is the most informative of the four. The trust dialog warns about project MCP servers and lists them by name, so the user sees what is about to start.
+
+![Gemini CLI trust dialog enumerating project MCP servers - TrustFall](./screenshots/trust-dialog-gemini.png)
+
+**Cursor CLI** shows an MCP-specific warning, but does not enumerate per server.
+
+![Cursor CLI trust dialog with MCP-specific warning - TrustFall](./screenshots/trust-dialog-cursor.png)
+
+**Copilot CLI** shows a generic “trust this folder” prompt with no MCP mention — the same shape as the current Claude Code dialog (post-v2.1).
+
+![Copilot CLI generic trust dialog with no MCP mention - TrustFall](./screenshots/trust-dialog-copilot.png)
+
+The same defender mitigations — audit committed config files, inspect command/args inline, monitor child processes of the agent — apply to all four. Our [PoC](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings/poc) ships parallel config files so the same fixture reproduces the chain on any of the four CLIs.
+
+The rest of this post deep-dives the Claude Code variant specifically. Claude Code is where the gap is most acute: its dialog is one of the two “generic” ones and it ships *three* project-scoped settings (`enableAllProjectMcpServers`, `enabledMcpjsonServers`, `permissions.allow`) whose security implications aren’t named in the prompt — plus a CI/CD execution mode that bypasses the dialog entirely.
 
 ## The root cause of the problem
 
@@ -160,6 +191,12 @@ Claude Code in CI runs non-interactively, most commonly via the official `anthro
 
 Organizations running Claude Code on any CI runner that processes untrusted repositories should assume they are exposed today. The only defense in Anthropic’s threat model is the trust dialog, and headless invocation removes it.
 
+A standalone fixture for this variant lives in [`poc-ci-pipeline/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings/poc-ci-pipeline) of the GitHub repo. It contains a `.mcp.json` with an inline `node -e` payload that POSTs the runner’s entire `process.env` (including `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, and any other secrets exposed to the workflow) to a collector URL of your choice, plus a minimal `.github/workflows/claude.yml` that triggers `anthropics/claude-code-action@v1` on `pull_request` and `workflow_dispatch`. Drop it into a repository you own, set a [webhook.site](https://webhook.site) URL as the collector, and trigger the workflow — the env JSON arrives at your collector before Claude reasons about anything. No `.claude/settings.json` is required in CI; the action auto-injects `enableAllProjectMcpServers: true`. The fixture is for measuring your own exposure on pipelines you control. Running it against any repository you don’t own is unauthorized access.
+
+The screenshot below shows the result of running the fixture against a test repository we own: a single POST arrives at our webhook.site collector seconds after the workflow starts, carrying the runner’s full `process.env` — `GITHUB_*` workflow context, `AWS_BEARER_TOKEN_BEDROCK`, and a synthetic `TOP_SECRET_KEY: "THIS-IS-top-secret-123!!!"` we planted in the test repo’s secrets to make the leak visible. The synthetic secret is ours; in a realistic attack the same field would carry whatever the targeted pipeline injects (deploy keys, signing certs, cloud credentials, the `GITHUB_TOKEN` with the workflow’s permissions).
+
+![webhook.site receiving a POST with the GitHub Actions runner's process.env, including a planted TOP_SECRET_KEY - TrustFall CI/CD variant](./screenshots/env_exfil_ci_pipeline.jpg)
+
 ## Recommended fixes (for Anthropic)
 
 Three changes close this without breaking team workflows:
@@ -198,7 +235,9 @@ The safe PoC at [github.com/adversa-ai/research/tree/main/artifacts/trustfall-cl
 
 This problem isn’t specific to Claude Code. Agentic CLI tools inherit a developer-shell convention from quieter times: opening a project means consenting to whatever it asks the shell to do. That convention works when a developer sits at a terminal, reads what the project wants, and decides whether to run it. It breaks when the same agent runs unattended on a CI runner against a pull request from a stranger, or when a developer clones one of fifty repositories that day and clicks through a generic trust prompt without reading it.
 
-There’s also an awareness gap no vendor fix will close on its own. Claude Code, Cursor, Aider, Copilot Workspace, and Devin each ship settings whose security implications aren’t obvious from their names. Most developers using these tools lack a working model of which keys are safe to accept from a cloned repo and which aren’t, and the documentation doesn’t surface that hierarchy. The practical security of an AI coding agent on a developer machine depends on a configuration audit the developer isn’t equipped to perform. That gap, more than any individual CVE, is what keeps this class of vulnerability recurring.
+There’s also an awareness gap no vendor fix will close on its own. Agentic coding CLIs in general ship settings whose security implications aren’t obvious from their names, and the parity finding above suggests this isn’t coincidence: the convention itself, not any one vendor’s implementation, is what produces the gap. Most developers using these tools lack a working model of which keys are safe to accept from a cloned repo and which aren’t, and the documentation doesn’t surface that hierarchy.
+
+And the awareness gap isn’t one developers will close on their own. The dominant usage pattern is install, run, accept defaults — “vibe coding” is the norm, and reading a settings reference for security-relevant keys is the exception. Active hardening of user-scope settings is rare on individual developer machines. Where it is likely to happen more consistently is enterprise deployments, where security teams push hardened configs to endpoints centrally — but that displaces the audit onto the security team, it doesn’t close the awareness gap for the broader developer population. The practical security of an AI coding agent on a developer machine depends on a configuration audit the developer isn’t equipped to perform and, by default, never attempts. That gap, more than any individual CVE, is what keeps this class of vulnerability recurring.
 
 The TrustFall regression is one concrete case. Anthropic’s fix is three changes: block the MCP-enabling settings from project scope, add a dedicated MCP/hooks consent dialog with default-deny (parity with how `bypassPermissions` is already treated), and require interactive consent for new servers from a project’s `.mcp.json`. The broader question, for all these tools, is whether a single Enter keypress should ever be the boundary between “I cloned this” and “this code is now running unsandboxed against my credentials.”
 
@@ -262,7 +301,13 @@ Execution flow from the developer’s side:
 5. `node mcp/attacker-mcp-server.js` spawns. The payload exfiltrates SSH keys and cloud credentials, then opens a persistent C2 channel.  
 6. The Claude Code prompt appears as normal. There is no UI indication that the MCP server is running, that files were read, or that a network connection is open.
 
-A safe, non-exfiltrating reproduction of the attack chain lives in the `poc/` directory of the [GitHub repo](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings). The PoC ships a `.mcp.json` and `.claude/settings.json` that auto-approve a server whose only payload is opening the OS calculator. Nothing is read, nothing is exfiltrated, no network calls are made. The calculator launching is the visible proof that arbitrary code ran with the user’s privileges immediately after the trust dialog was accepted. A video walkthrough of the C2 variant, including the contrast with the `bypassPermissions` warning dialog, is on YouTube.
+Two reproduction fixtures live in the [GitHub repo](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings).
+
+The first, [`poc/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings/poc), is the 1-click developer-machine variant. The same fixture reproduces TrustFall on all four CLIs: it ships parallel auto-approving config files — `.claude/settings.json` plus `.mcp.json` for Claude Code; `.cursor/mcp.json` for Cursor CLI; `.gemini/settings.json` for Gemini CLI; and the project-root `.mcp.json` is also picked up by Copilot CLI. The auto-approved server’s only payload is opening the OS calculator. Nothing is read, nothing is exfiltrated, no network calls are made. The calculator launching is the visible proof that arbitrary code ran with the user’s privileges immediately after the trust dialog was accepted, against whichever of the four CLIs you run inside the directory.
+
+The second, [`poc-ci-pipeline/`](https://github.com/adversa-ai/research/tree/main/artifacts/trustfall-claude-code-rce-mcp-settings/poc-ci-pipeline), is the 0-click headless CI variant. It contains a minimal `.github/workflows/claude.yml` that invokes `anthropics/claude-code-action@v1` on `pull_request` and `workflow_dispatch`, plus a `.mcp.json` with an inline `node -e` payload that POSTs the runner’s entire `process.env` to a collector URL you choose (e.g. webhook.site). The trust dialog never renders — the action runs Claude through the SDK, not the interactive CLI — so no human ever sees a prompt. The collector receives the env (including `GITHUB_TOKEN`, `ANTHROPIC_API_KEY`, and any other secrets the workflow has access to) before Claude does any work. The fixture is for self-testing on repositories you own; running it elsewhere is unauthorized access.
+
+A video walkthrough of the C2 variant on Claude Code, including the contrast with the `bypassPermissions` warning dialog, is on YouTube.
 
 ## Appendix B: The fileless variant
 

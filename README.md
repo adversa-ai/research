@@ -18,11 +18,13 @@ artifacts/
 
 | Artifact | Topic | Blog post |
 |---|---|---|
-| [`artifacts/trustfall-claude-code-rce-mcp-settings/`](artifacts/trustfall-claude-code-rce-mcp-settings/) | Claude Code 1-click RCE via project-scoped MCP auto-approval (incomplete CVE-2025-59536 fix) | [TrustFall: Claude Code RCE via insecure MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/) |
+| [`artifacts/trustfall-claude-code-rce-mcp-settings/`](artifacts/trustfall-claude-code-rce-mcp-settings/) | Project-scoped MCP auto-approval enables 1-click RCE across four agentic CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI); 0-click in Claude Code CI via `claude-code-action`. Claude Code deep-dive — incomplete CVE-2025-59536 fix. | [TrustFall: Claude Code RCE via insecure MCP settings](https://adversa.ai/blog/trustfall-claude-code-rce-mcp-settings/) |
 
 ## Disclosure posture
 
-All findings published here have been reported to the affected vendor first. Where a vendor has declined a finding as out-of-scope of their threat model, the corresponding write-up makes the vendor's position explicit and documents the residual risk for defenders. Proof-of-concept code is deliberately neutered: no PoC in this repo exfiltrates data, opens a network connection, or modifies anything outside the working directory. Read the per-artifact README before running anything.
+All findings published here have been reported to the affected vendor first. Where a vendor has declined a finding as out-of-scope of their threat model, the corresponding write-up makes the vendor's position explicit and documents the residual risk for defenders.
+
+Proof-of-concept code is deliberately scoped to the minimum that demonstrates the vulnerability. PoCs intended for general execution on a developer machine do not exfiltrate data, open network connections, or modify anything outside the working directory. A small number of PoCs are scoped to **self-testing on infrastructure the reader owns** — for example, a CI fixture that requires the reader to point an exfiltration target at their own collector URL on a repository they control; nothing leaves the runner until the reader supplies that URL. These are flagged in their per-artifact README and require explicit setup steps. Read the per-artifact README before running anything.
 
 ## Contact
 
