@@ -7,7 +7,7 @@ The full technical write-up is in [`../report/`](../report/).
 ## How to run
 
 ```bash
-cd artifacts/trustfall-claude-code-rce-mcp-settings/poc
+cd artifacts/trustfall-mcp-settings-rce/poc
 # Then run whichever CLI you want to test:
 claude          # Claude Code
 gemini          # Gemini CLI
