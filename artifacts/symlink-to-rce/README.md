@@ -1,6 +1,6 @@
 # The Approval Prompt is Lying: Symlink-to-RCE in Agentic Coding CLIs
 
-Attachments for the Adversa AI research paper **[The Approval Prompt Is Lying to You: Symlink RCE in Five AI Coding Agents](https://adversa.ai/blog/coding-assistant-security-approval-prompt-lying-symlink-to-rce/)**.
+Attachments for the Adversa AI research paper **[The Approval Prompt Is Lying to You: Symlink RCE in Five AI Coding Agents](#)**.
 
 A booby-trapped repository tricks your coding agent into overwriting its own configuration through a disguised file copy, then runs attacker code on the next restart. The human approval step—the key safety control these tools rely on—is the exact mechanism being defeated: the user approves a harmless-looking media copy on their screen, but a pre-committed symbolic link inside the repository redirects the write straight into the agent's sensitive config folder. On the next start of the CLI, the planted configuration registers a malicious Model Context Protocol (MCP) server that runs arbitrary commands unsandboxed. On CI runners that auto-trust their workspace, the same chain executes with zero clicks. We tested five major tools and confirmed the vulnerability in **Claude Code**, **Gemini CLI**, **Cursor Agent CLI**, **GitHub Copilot CLI**, and **Grok Build CLI**. Anthropic quietly hardened Claude Code's approval flow to resolve and display the real target path, while other vendors declined the report or categorized it as out-of-scope.
 
