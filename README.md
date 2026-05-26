@@ -18,7 +18,7 @@ artifacts/
 
 | Artifact | Topic | Blog post |
 |---|---|---|
-| [`artifacts/symlink-to-rce/`](artifacts/symlink-to-rce/) | Deceptive shell file copies combined with pre-committed symbolic links silently overwrite configurations to achieve unsandboxed RCE upon assistant restart. Confirmed across Claude Code, Gemini CLI, Cursor Agent CLI, GitHub Copilot CLI, and Grok Build CLI. | [The Approval Prompt Is Lying to You: Symlink RCE in Five AI Coding Agents](https://adversa.ai/blog/the-approval-prompt-is-lying-to-you-symlink-rce-in-five-ai-coding-agents-claude-code-cursor-antigravity-copilot-grok-build/) |
+| [`artifacts/symlink-to-rce/`](artifacts/symlink-to-rce/) | Deceptive shell file copies combined with pre-committed symbolic links silently overwrite configurations to achieve unsandboxed RCE upon assistant restart. Confirmed across Claude Code, Gemini CLI, Cursor Agent CLI, GitHub Copilot CLI, and Grok Build CLI. | [SymJack: the approval prompt is lying to you. A symlink-hijack RCE in five AI coding agents](https://adversa.ai/blog/the-approval-prompt-is-lying-to-you-symlink-rce-in-five-ai-coding-agents-claude-code-cursor-antigravity-copilot-grok-build/) |
 | [`artifacts/trustfall-mcp-settings-rce/`](artifacts/trustfall-mcp-settings-rce/) | Project-scoped MCP auto-approval enables 1-click RCE across four agentic CLIs (Claude Code, Gemini CLI, Cursor CLI, Copilot CLI); 0-click in Claude Code CI via `claude-code-action`. Same project-scoped settings convention as CVE-2025-59536; classified by Anthropic as design intent. | [TrustFall: One-keypress RCE in agentic coding CLIs via project-scoped MCP settings](https://adversa.ai/blog/trustfall-coding-agent-security-flaw-rce-claude-cursor-gemini-cli-copilot/) |
 
 ## Disclosure posture
