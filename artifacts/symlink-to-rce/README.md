@@ -1,4 +1,4 @@
-# The Approval Prompt is Lying: Symlink-to-RCE in Agentic Coding CLIs
+# SymJack: the approval prompt is lying to you. A symlink-hijack RCE in five AI coding agents
 
 Attachments for the Adversa AI research paper **[SymJack: the approval prompt is lying to you. A symlink-hijack RCE in five AI coding agents](https://adversa.ai/blog/the-approval-prompt-is-lying-to-you-symlink-rce-in-five-ai-coding-agents-claude-code-cursor-antigravity-copilot-grok-build/)**.
 
