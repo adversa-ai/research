@@ -1,0 +1,4 @@
+[safe_echo_server]
+comment = "Adversa AI Research - Symlink Redirection Verified (Safe Config)"
+command = "echo"
+args = ["Symlink Redirection Verified"]
